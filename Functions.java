@@ -213,3 +213,97 @@ InputStream fileOpen(String filename) {}
 void passwordAttemptFailedNtimes(int attempts) {}
 // 4. using an output argument instead of a return value
 // for a transformation is confusing
+
+// flag arguments
+// bad code
+render(boolean isSuite);
+
+// good code
+renderForSuite();
+renderForSingleTest();
+
+// dyadic functions
+writeField(outputStream, name);
+
+// convert dyads into monads
+outputStream.writeField(name);
+
+class ExampleClass {
+	private OutputStream outputStream;
+	public writeField(name) {}
+}
+
+class FieldWriter {
+	private OutputStream outputStream;
+	FieldWriter(OutputStream outputStream) {
+		this.outputStream = outputStream;
+	}
+	public write(name) {}
+}
+
+// triads
+// think very carefully before creating a triad
+
+// have no side effects
+// bad code
+public class UserValidator {
+	private Crytographer cryptographer;
+	public boolean checkPassword(String username, String password) {
+		User user = UserGateway.findByName(username);
+		if (user != User.NULL) {
+			String codedPhrase = user.getPhraseEncodedByPassword();
+			String phrase = cryptographer.decrypt(codedPhrase, password);
+			if ("Valid Password".equals(phrase)) {
+				Session.initialize(); // side effect
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+// argument objects
+// when a function seems to beed more than two or three arguments,
+// it is likely that some of those arguments ought to be wrapped
+// into a class of their own
+Circle makeCircle(double x, double y, double radius);
+
+// good code
+Circle makeCircle(Point center, double radius);
+
+// argument lists
+public String format(String format, Object... args);
+
+void monad(Integer... args);
+void dyad(String name, Integer... args);
+void triad(String name, int count, Integer... args);
+
+// verb and keywords
+write(name)
+writeField(name)
+assertExpectedEqualsActual(expected, actual)
+
+// the side effect creates a temporal coupling
+
+// temporal couplings are confusing, especially when
+// hidden as a side effect
+
+// if you must have a temporal coupling, you should
+// make it clear in the name of the function
+public class UserValidator {
+	private Crytographer cryptographer;
+	public boolean checkPasswordAndInitializeSession(String username, String password) {
+		User user = UserGateway.findByName(username);
+		if (user != User.NULL) {
+			String codedPhrase = user.getPhraseEncodedByPassword();
+			String phrase = cryptographer.decrypt(codedPhrase, password);
+			if ("Valid Password".equals(phrase)) {
+				Session.initialize(); // side effect
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+// output arguments
