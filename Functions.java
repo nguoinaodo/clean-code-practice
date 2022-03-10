@@ -307,3 +307,223 @@ public class UserValidator {
 }
 
 // output arguments
+// anything that forces you to check the function signature
+// is equivalent to a double-take, it's a cognitive break
+// and should be avoided
+public void appendFooter(StringBuffer report) {}
+appendFooter(s);
+
+// good code
+report.appendFooter();
+// in general output argument should be avoided
+// if yout function must change the state of something,
+// have it change the state of its owning object
+
+// command query separation
+// function should either do something or answer something,
+// but not both
+// bad code
+public boolean set(String attribute, String value);
+
+if (set("username", "unclebob")) {}
+
+// good code
+if (attributeExists("username")) {
+	setAttribute("username", "unclebob");
+}
+
+// prefer exceptions to returning error codes
+// bad code
+if (deletePage(page) == E_OK) {
+	if (registry.deleteReference(page.name) == E_OK) {
+		if (configKeys.deleteKey(page.name.makeKey()) == E_OK) {
+			logger.log("page deleted");
+		} else {
+			logger.log("configKey not deleted");
+		}
+	} else {
+		logger.log("deleteReference from registry failed");
+	}
+} else {
+	logger.log("delete failed");
+	return E_ERROR;
+}
+
+// good code
+try {
+	deletePage(page);
+	registry.deleteReference(page.name);
+	configKeys.deleteKey(page.name.makeKey());
+}
+catch (Exception e) {
+	logger.log(e.getMessage)
+}
+
+// extract try/catch blocks
+// try/catch blocks are ugly in their own right, they confuse
+// the structure of the code and mix error processing with
+// normal processing, so it is better to extract the bodies
+// of the try and catch blocks out into functions of their own
+
+// better code
+public void delete(Page page) {
+	try {
+		deletePageAndAllReferences(page);
+	}
+	catch (Exception e) {
+		logError(e);
+	}
+}
+
+private void deletePageAndAllReferences(Page page) throws Exception {
+	deletePage(page);
+	registry.deleteReference(page.name);
+	configKeys.deleteKey(page.name.makeKey());
+}
+
+private void logError(Exception e) {
+	logger.log(e.getMessage());
+}
+
+// error handling is one thing
+// function should do one thing, error handling is one thing,
+// thus a function that handles errors should do nothing else
+
+// the Error.java dependency magnet
+pulic enum Error {
+	OK,
+	INVALID,
+	NO_SUCH,
+	LOCKED,
+	OUT_OF_RESOURCES,
+	WAITING_FOR_EVENT;
+}
+// classes like this are a dependency magnet, many other classes
+// must import and use them
+// when you use exceptions rather than error codes, then
+// new exceptions are derivatives of the exception class, they
+// can be added without forcing any recompilation or redeployment
+
+// don't repeat yourself
+
+// When I write functions, they come out long and complicated.
+// They have lots of indenting and nested loops. They have long
+// argument lists. The name are arbitrary, and there is duplicated code.
+// But I also have a suite of unit tests that cover every one of
+// those clumsy lines of code.
+
+// So the I massage and refine that code, splitting out functions,
+// changing names, eliminating duplication. I shrink the methods and reorder them.
+// Sometimes I break out whole class, all the while keeping
+// the tests passing.
+
+// good code
+package fitnesse.html;
+
+import fitnesse.responders.run.SuiteResponder;
+import fitness.wiki.*;
+
+public class SetupTeardownIncluder {
+	private PageData pageData;
+	private boolean isSuite;
+	private WikiPage testPage;
+	private StringBuffer newPageContent;
+	private PageCrawler pageCrawler;
+
+	public static String render(PageData pageData) throws Exception {
+		return render(pageData, false);
+	}
+
+	public static String render(PageData pageData, boolean isSuite)
+	throws Exception {
+		return new SetupTeardownIncluder(pageData).render(isSuite);
+	}
+
+	private SetupTeardownIncluder(PageData pageData) {
+		this.pageData = pageData;
+		testPage = pageData.getWikiPage();
+		pageCrawler = testPage.getPageCrawler();
+		newPageContent = new StringBuffer();
+	}
+
+	private String render(boolean isSuite) throws Exception {
+		this.isSuite = isSuite;
+		if (isTestPage())
+			includeSetupAndTeardownPages();
+		return pageData.getHtml();
+	}
+
+	private boolean isTestPage() throws Exception {
+		return pageData.hasAttribute("Test");
+	}
+
+	private void includeSetupAndTeardownPages() throws Exception {
+		includeSetupPages();
+		includePageContent();
+		includeTeardownPages();
+		updatePageContent();
+	}
+
+	private void includeSetupPages() throws Exception {
+		if (isSuite)
+			includeSuiteSetupPage();
+		includeSetupPage();
+	}
+
+	private void includeSuiteSetupPage() throws Exception {
+		include(SuiteResponder.SUITE_SETUP_NAME, "-setup");
+	}
+
+	private void includeSetupPage() throws Exception {
+		include("SetUp", "-setup");
+	}
+
+	private void includePageContent() throws Exception {
+		newPageContent.append(pageData.getContent());
+	}
+
+	private void includeTeardownPages() throws Exception {
+		includeTeardownPage();
+		if (isSuite)
+			includeSuiteTeardownPage();
+	}
+
+	private void includeTeardownPage() throws Exception {
+		include("TearDown", "-teardown");
+	}
+
+	private void includeSuiteTeardownPage() throws Exception {
+		include(SuiteRender.SUITE_TEARDOWN_NAME, "-teardown");
+	}
+
+	private void updatePageContent() throws Exception {
+		pageData.setContent(newPageContent.toString());
+	}
+
+	private void include(String pageName, String arg) throws Exception {
+		WikiPage inheritedPage = findInheritedPage(pageName);
+		if (inheritedPage != null) {
+			String pagePathName = getPathNameForPage(inheritedPage);
+			buildIncludeDirective(pagePathName, arg);
+		}
+	}
+
+	private WikiPage findInheritedPage(String pageName) throws Exception {
+		return PageCrawlerImpl.getInheritedPage(pageName, testPage);
+	}
+
+	private String getPathNameForPage(WikiPage page) throws Exception {
+		WikiPagePath pagePath = pageCrawler.getFullPath(page);
+		return PathParser.render(pagePath);
+	}
+
+	private void buildIncludeDirective(String pagePathName, String arg) {
+		newPageContent
+			.append("\n!include ")
+			.append(arg)
+			.append(" .")
+			.append(pagePathName)
+			.append("\n");
+	}
+
+}
