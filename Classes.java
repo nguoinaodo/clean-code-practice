@@ -310,3 +310,90 @@ public class PrimeGenerator {
 		return multiple;
 	}
 }
+
+// organizing for change: We want to structure our systems
+// so that we muck with as little as possible when we update
+// them with new or changed features. In an ideal system,
+// we incorporate new features by extending the system, not
+// by making modifications to existing code
+
+// code that violate SRP, OCP
+public class Sql {
+ public Sql(String table, Column[] columns)
+ public String create()
+ public String insert(Object[] fields)
+ public String selectAll()
+ public String findByKey(String keyColumn, String keyValue)
+ public String select(Column column, String pattern)
+ public String select(Criteria criteria)
+ public String preparedInsert()
+ private String columnList(Column[] columns)
+ private String valuesList(Object[] fields, final Column[] columns)
+ private String selectWithCriteria(String criteria)
+ private String placeholderList(Column[] columns)
+}
+
+// refactored code
+abstract public class Sql {
+	public Sql(String table, Column[] columns)
+	abstract public String generate();
+}
+
+public class CreateSql extends Sql {
+	public CreateSql(String table, Column[] columns)
+	@Override public String generate()
+}
+
+public class SelectSql extends Sql {
+	public SelectSql(String table, Column[] columns)
+	@Override public String generate()
+}
+
+public class InsertSql extends Sql {
+	public InsertSql(String table, Column[] columns, Object[] fields)
+	@Override public String generate()
+	private String valuesList(Object[] fields, final Column[] columns)
+}
+//...
+
+// isolating from change
+// A client class depending upon concrete details is at risk
+// when those details change. We can introduce interfaces and
+// abstract classes to help isolate the impact of those details.
+// Dependencies upon concrete details create challenges
+// for testing our system.
+// The lack of coupling means that the elements of our system
+// are better isolated from each other and from change. This
+// isolation makes it easier to understand each element of
+// the system.
+// Design principle - Dependency Inversion Principle: our classes
+// should depend upon abstractions, not on concrete details.
+public interface StockExchange {
+	Money currentPrice(String symbol);
+}
+
+public Portfolio {
+	private StockExchange exchange;
+	public Portfolio(StockExchange exchange) {
+		this.exchange = exchange;
+	}
+	//...
+}
+
+public class PortfolioTest {
+	private FixedStockExchangeStub exchange;
+	private Portfolio portfolio;
+
+	@Before
+	protected void setUp() throws Exception {
+		exchange = new FixedStockExchangeStub();
+		exchange.fix("MSFT", 100);
+		portfolio = new Portfolio(exchange);
+	}
+
+	@Test
+	public void GivenFiveMSFTTotalShouldBe500() throws Exception {
+		portfolio.add(5, "MSFT");
+		Assert.assertEquals(500, portfolio.value());
+	}
+}
